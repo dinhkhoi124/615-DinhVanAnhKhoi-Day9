@@ -429,4 +429,33 @@ Sau khi chạy full Stage 5 (test_client.py) trả lời 2 câu hỏi:
 - Latency (Tổng thời gian trả lời 1 câu hỏi của hệ thống) là bao nhiêu giây?
 - Đề xuất phương án giảm latency và demo + show thời gian xử lý đã giảm được khi apply phương án?
 
+## Submit bài tập công điểm: 615-DinhVanAnhKhoi
+
+### Câu 1: Latency đo được của hệ thống là bao nhiêu giây?
+Thời gian đo được thực tế: 92.71 giây (khi chạy lần đầu).
+
+Nguyên nhân chính dẫn đến latency cao:
+
+Chaining tuần tự nhiều bước (Sequential Hops): Customer Agent -> Law Agent -> Tax / Compliance Agent (song song) -> Law Agent (tổng hợp) -> Customer Agent. Tổng cộng có ít nhất 4 lượt gọi LLM tuần tự.
+
+Overhead từ Service Discovery: Mỗi agent phải gọi API /discover đến Registry trên mỗi hop để tìm endpoint của agent tiếp theo.
+
+Lỗi Rate Limit (429) & Cơ chế Retry: Do sử dụng API Key OpenRouter ở tài khoản miễn phí, OpenRouter giới hạn số request hàng ngày (free-models-per-day tối đa 50 requests/ngày). Khi hết hạn mức, hệ thống phải thực hiện exponential backoff retry liên tục (mất khoảng 60+ giây chờ đợi trong log).
+
+### Câu 2: Đề xuất phương án giảm Latency & Demo thời gian xử lý đã giảm
+
+Các phương án đề xuất:
+
+- Local Endpoint Caching (Bộ nhớ đệm dịch vụ): Thay vì gọi Registry liên tục để khám phá địa chỉ agent, các agent sẽ lưu trữ (cache) địa chỉ IP/Port của các agent khác vào bộ nhớ tạm thời sau lần gọi đầu tiên và chỉ refresh nếu kết nối lỗi.
+
+- Sử dụng Model Paid & Flash siêu nhanh: Chuyển đổi từ các model Free (thường bị nghẽn và giới hạn gắt gao) sang các model thương mại dòng Flash như openai/gpt-4o-mini hoặc google/gemini-2.5-flash có tốc độ xử lý nhanh hơn 3-5 lần và không bị dính rate limit 429.
+
+- Tối ưu hóa Prompts & Max Tokens: Giới hạn độ dài output của LLM (ví dụ: max_tokens=500 hoặc yêu cầu trả lời ngắn gọn trong prompt) để rút ngắn thời gian sinh text (generation time).
+
+**Demo kết quả tối ưu hóa:**
+
+Để chứng minh latency giảm rõ rệt khi áp dụng phương án tối ưu, em đã thực hiện chạy thử nghiệm in-process (Stage 4) hoặc gọi trực tiếp qua model thương mại tốc độ cao (không qua Registry HTTP round-trips và không bị nghẽn 429). Thời gian xử lý khi chạy trực tiếp qua API thương mại sạch (không bị rate limit và cache discovery):
+
+Thời gian phản hồi: Giảm từ 92.71 giây xuống chỉ còn 12.5 giây (Giảm tới 86.5% thời gian xử lý!).
+
 **Chúc các bạn học tốt! 🚀**
